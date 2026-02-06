@@ -11,20 +11,6 @@ describe('YourDesignHouseInfraStack', () => {
     template = Template.fromStack(stack);
   });
 
-  test('Creates Cognito User Pool', () => {
-    template.hasResourceProperties('AWS::Cognito::UserPool', {
-      UserPoolName: 'your-design-house-user-pool',
-      AutoVerifiedAttributes: ['email'],
-    });
-  });
-
-  test('Creates Cognito User Pool Client with OAuth2', () => {
-    template.hasResourceProperties('AWS::Cognito::UserPoolClient', {
-      AllowedOAuthFlows: ['code'],
-      AllowedOAuthScopes: ['email', 'openid', 'profile'],
-    });
-  });
-
   test('Creates Lambda Function', () => {
     template.hasResourceProperties('AWS::Lambda::Function', {
       FunctionName: 'writeToDynamo',
@@ -38,17 +24,30 @@ describe('YourDesignHouseInfraStack', () => {
     });
   });
 
-  test('Creates Cognito Authorizer', () => {
-    template.hasResourceProperties('AWS::ApiGateway::Authorizer', {
-      Type: 'COGNITO_USER_POOLS',
-      Name: 'CognitoAuthorizer',
+  test('API Gateway has rate limiting configured', () => {
+    template.hasResourceProperties('AWS::ApiGateway::Stage', {
+      StageName: 'prod',
+      MethodSettings: [
+        {
+          HttpMethod: '*',
+          ResourcePath: '/*',
+          ThrottlingRateLimit: 10,
+          ThrottlingBurstLimit: 20,
+        },
+      ],
     });
   });
 
-  test('POST method uses Cognito authorizer', () => {
+  test('POST method is unauthenticated', () => {
     template.hasResourceProperties('AWS::ApiGateway::Method', {
       HttpMethod: 'POST',
-      AuthorizationType: 'COGNITO_USER_POOLS',
+      AuthorizationType: 'NONE',
     });
+  });
+
+  test('Does not create Cognito resources', () => {
+    template.resourceCountIs('AWS::Cognito::UserPool', 0);
+    template.resourceCountIs('AWS::Cognito::UserPoolClient', 0);
+    template.resourceCountIs('AWS::ApiGateway::Authorizer', 0);
   });
 });

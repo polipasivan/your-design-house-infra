@@ -1,6 +1,5 @@
 import * as cdk from 'aws-cdk-lib/core';
 import { Construct } from 'constructs';
-import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -11,76 +10,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
     super(scope, id, props);
 
     // ========================================
-    // 1. COGNITO USER POOL
-    // ========================================
-    const userPool = new cognito.UserPool(this, 'YourDesignHouseUserPool', {
-      userPoolName: 'your-design-house-user-pool',
-      selfSignUpEnabled: true,
-      signInAliases: {
-        email: true,
-      },
-      autoVerify: {
-        email: true,
-      },
-      standardAttributes: {
-        email: {
-          required: true,
-          mutable: true,
-        },
-      },
-      passwordPolicy: {
-        minLength: 8,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireDigits: true,
-        requireSymbols: false,
-      },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    // Cognito Domain for Hosted UI
-    const userPoolDomain = userPool.addDomain('CognitoDomain', {
-      cognitoDomain: {
-        domainPrefix: 'your-design-house',
-      },
-    });
-
-    // App Client for Web Application (OAuth2 Authorization Code Grant)
-    const userPoolClient = userPool.addClient('WebAppClient', {
-      userPoolClientName: 'web-app-client',
-      generateSecret: false,
-      authFlows: {
-        userPassword: true,
-        userSrp: true,
-      },
-      oAuth: {
-        flows: {
-          authorizationCodeGrant: true,
-          implicitCodeGrant: false,
-        },
-        scopes: [
-          cognito.OAuthScope.EMAIL,
-          cognito.OAuthScope.OPENID,
-          cognito.OAuthScope.PROFILE,
-        ],
-        callbackUrls: [
-          'http://localhost:3000/callback',
-        ],
-        logoutUrls: [
-          'http://localhost:3000/',
-        ],
-      },
-      supportedIdentityProviders: [
-        cognito.UserPoolClientIdentityProvider.COGNITO,
-      ],
-      accessTokenValidity: cdk.Duration.hours(1),
-      idTokenValidity: cdk.Duration.hours(1),
-      refreshTokenValidity: cdk.Duration.days(30),
-    });
-
-    // ========================================
-    // 2. LAMBDA FUNCTION
+    // 1. LAMBDA FUNCTION
     // ========================================
     const writeToDynamoFunction = new lambdaNodejs.NodejsFunction(this, 'WriteToDynamoFunction', {
       functionName: 'writeToDynamo',
@@ -101,22 +31,22 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
     });
 
     // ========================================
-    // 3. API GATEWAY WITH COGNITO AUTHORIZER
+    // 2. API GATEWAY WITH RATE LIMITING
     // ========================================
     const api = new apigateway.RestApi(this, 'YourDesignHouseApi', {
       restApiName: 'Your Design House API',
       description: 'API for Your Design House application',
       deployOptions: {
         stageName: 'prod',
-        throttlingRateLimit: 100,
-        throttlingBurstLimit: 200,
+        // Rate limiting to protect writes
+        throttlingRateLimit: 10,  // 10 requests per second
+        throttlingBurstLimit: 20, // Allow burst up to 20 requests
       },
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: ['POST', 'OPTIONS'],
         allowHeaders: [
           'Content-Type',
-          'Authorization',
           'X-Amz-Date',
           'X-Api-Key',
           'X-Amz-Security-Token',
@@ -125,14 +55,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       },
     });
 
-    // Cognito Authorizer
-    const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'CognitoAuthorizer', {
-      cognitoUserPools: [userPool],
-      authorizerName: 'CognitoAuthorizer',
-      identitySource: 'method.request.header.Authorization',
-    });
-
-    // /writeToDynamo endpoint
+    // /writeToDynamo endpoint (unauthenticated with rate limiting)
     const writeToDynamoResource = api.root.addResource('writeToDynamo');
 
     writeToDynamoResource.addMethod(
@@ -141,13 +64,12 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
         proxy: true,
       }),
       {
-        authorizer: cognitoAuthorizer,
-        authorizationType: apigateway.AuthorizationType.COGNITO,
+        authorizationType: apigateway.AuthorizationType.NONE,
       }
     );
 
     // ========================================
-    // 4. CLOUDFORMATION OUTPUTS
+    // 3. CLOUDFORMATION OUTPUTS
     // ========================================
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: api.url,
@@ -159,30 +81,6 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       value: `${api.url}writeToDynamo`,
       description: 'Full endpoint URL for writeToDynamo',
       exportName: 'WriteToDynamoEndpoint',
-    });
-
-    new cdk.CfnOutput(this, 'UserPoolId', {
-      value: userPool.userPoolId,
-      description: 'Cognito User Pool ID',
-      exportName: 'YourDesignHouseUserPoolId',
-    });
-
-    new cdk.CfnOutput(this, 'UserPoolClientId', {
-      value: userPoolClient.userPoolClientId,
-      description: 'Cognito User Pool Client ID',
-      exportName: 'YourDesignHouseUserPoolClientId',
-    });
-
-    new cdk.CfnOutput(this, 'CognitoDomain', {
-      value: userPoolDomain.domainName,
-      description: 'Cognito Domain for Hosted UI',
-      exportName: 'YourDesignHouseCognitoDomain',
-    });
-
-    new cdk.CfnOutput(this, 'CognitoHostedUIUrl', {
-      value: `https://${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
-      description: 'Cognito Hosted UI Base URL',
-      exportName: 'YourDesignHouseCognitoHostedUIUrl',
     });
   }
 }
