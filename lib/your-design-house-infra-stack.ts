@@ -1,16 +1,43 @@
 import * as cdk from 'aws-cdk-lib/core';
 import { Construct } from 'constructs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as path from 'path';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 
 export class YourDesignHouseInfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // ========================================
-    // 1. LAMBDA FUNCTION
+    // 1. DYNAMODB TABLE
+    // ========================================
+    const confessionsTable = new dynamodb.Table(this, 'ConfessionsTable', {
+      tableName: 'confessions',
+      partitionKey: {
+        name: 'id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const designDetailsTable = new dynamodb.Table(this, 'DesignDetailsTable', {
+      tableName: 'design-details',
+      partitionKey: {
+        name: 'id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      stream: dynamodb.StreamViewType.NEW_IMAGE,
+    });
+
+    // ========================================
+    // 2. LAMBDA FUNCTION
     // ========================================
     const writeToDynamoFunction = new lambdaNodejs.NodejsFunction(this, 'WriteToDynamoFunction', {
       functionName: 'writeToDynamo',
@@ -21,6 +48,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       environment: {
         NODE_OPTIONS: '--enable-source-maps',
+        TABLE_NAME: confessionsTable.tableName,
       },
       bundling: {
         minify: true,
@@ -30,8 +58,66 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       },
     });
 
+    // Grant Lambda write permissions to DynamoDB
+    confessionsTable.grantWriteData(writeToDynamoFunction);
+
+    const designDetailsFunction = new lambdaNodejs.NodejsFunction(this, 'DesignDetailsFunction', {
+      functionName: 'designDetails',
+      entry: path.join(__dirname, 'lambda', 'designDetails', 'index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        NODE_OPTIONS: '--enable-source-maps',
+        TABLE_NAME: designDetailsTable.tableName,
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        target: 'node20',
+        forceDockerBundling: false,
+      },
+    });
+
+    designDetailsTable.grantWriteData(designDetailsFunction);
+
+    const sendEmailFunction = new lambdaNodejs.NodejsFunction(this, 'SendEmailFunction', {
+      functionName: 'sendEmail',
+      entry: path.join(__dirname, 'lambda', 'sendEmail', 'index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        NODE_OPTIONS: '--enable-source-maps',
+        SENDER_EMAIL: 'yoursbyemily@gmail.com',
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        target: 'node20',
+        forceDockerBundling: false,
+      },
+    });
+
+    sendEmailFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+        resources: ['*'],
+      })
+    );
+
+    sendEmailFunction.addEventSource(
+      new lambdaEventSources.DynamoEventSource(designDetailsTable, {
+        startingPosition: lambda.StartingPosition.LATEST,
+        batchSize: 1,
+        retryAttempts: 3,
+      })
+    );
+
     // ========================================
-    // 2. API GATEWAY WITH RATE LIMITING
+    // 3. API GATEWAY WITH RATE LIMITING
     // ========================================
     const api = new apigateway.RestApi(this, 'YourDesignHouseApi', {
       restApiName: 'Your Design House API',
@@ -68,8 +154,21 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       }
     );
 
+    // /design-details endpoint
+    const designDetailsResource = api.root.addResource('design-details');
+
+    designDetailsResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(designDetailsFunction, {
+        proxy: true,
+      }),
+      {
+        authorizationType: apigateway.AuthorizationType.NONE,
+      }
+    );
+
     // ========================================
-    // 3. CLOUDFORMATION OUTPUTS
+    // 4. CLOUDFORMATION OUTPUTS
     // ========================================
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: api.url,
@@ -81,6 +180,12 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       value: `${api.url}writeToDynamo`,
       description: 'Full endpoint URL for writeToDynamo',
       exportName: 'WriteToDynamoEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'DesignDetailsEndpoint', {
+      value: `${api.url}design-details`,
+      description: 'Full endpoint URL for design-details',
+      exportName: 'DesignDetailsEndpoint',
     });
   }
 }

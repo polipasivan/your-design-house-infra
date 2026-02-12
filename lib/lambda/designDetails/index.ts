@@ -8,9 +8,9 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME!;
 
-interface ConfessionBody {
-  confession: string;
-  email?: string;
+interface DesignDetailsBody {
+  name: string;
+  email: string;
 }
 
 const CORS_HEADERS = {
@@ -19,19 +19,18 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-//FIX this, this is patch worky 
-function validateBody(body: unknown): body is ConfessionBody {
+function validateBody(body: unknown): body is DesignDetailsBody {
   if (typeof body !== 'object' || body === null) {
     return false;
   }
 
   const obj = body as Record<string, unknown>;
 
-  if (typeof obj.confession !== 'string' || obj.confession.trim() === '') {
+  if (typeof obj.name !== 'string' || obj.name.trim() === '') {
     return false;
   }
 
-  if (obj.email !== undefined && typeof obj.email !== 'string') {
+  if (typeof obj.email !== 'string' || obj.email.trim() === '') {
     return false;
   }
 
@@ -65,7 +64,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       statusCode: 400,
       headers: CORS_HEADERS,
       body: JSON.stringify({
-        error: 'Invalid request body. Expected: { confession: string; email?: string }',
+        error: 'Invalid request body. Expected: { name: string, email: string }',
       }),
     };
   }
@@ -79,8 +78,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         TableName: TABLE_NAME,
         Item: {
           id,
-          confession: parsedBody.confession.trim(),
-          ...(parsedBody.email && { email: parsedBody.email.trim() }),
+          name: parsedBody.name.trim(),
+          email: parsedBody.email.trim(),
           createdAt: timestamp,
         },
       })
@@ -90,7 +89,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     return {
       statusCode: 500,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ error: 'Failed to save confession' }),
+      body: JSON.stringify({ error: 'Failed to save design details' }),
     };
   }
 
@@ -98,7 +97,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     statusCode: 201,
     headers: CORS_HEADERS,
     body: JSON.stringify({
-      message: 'Confession saved successfully',
+      message: 'Design details saved successfully',
       id,
       timestamp,
     }),
