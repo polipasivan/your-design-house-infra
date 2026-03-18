@@ -98,7 +98,7 @@ Accepts design consultation intake forms. Triggers an email notification to the 
 | `designDetails` | API Gateway | Validates and writes design client info to DynamoDB |
 | `sendEmail` | DynamoDB Stream | Sends email to business owner on new design-details inserts |
 
-All Lambdas: Node.js 20.x, 256 MB memory, 30s timeout, esbuild bundled with source maps.
+All Lambdas: Node.js 24, 256 MB memory, 30s timeout, esbuild bundled with source maps.
 
 ## Commands
 
