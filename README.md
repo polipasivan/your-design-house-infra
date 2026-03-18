@@ -61,10 +61,10 @@ Serverless event-driven infrastructure for **Your Design House**, a design consu
 | Service | Resource | Purpose |
 |---------|----------|---------|
 | **API Gateway** | REST API | Public endpoints with rate limiting (10 req/s, 20 burst) |
-| **Lambda** | 3 functions (Node.js 20.x) | Request handling and email notifications |
+| **Lambda** | 3 functions (Node.js 24) | Request handling and email notifications |
 | **DynamoDB** | 2 tables | Store confessions and design client details |
 | **DynamoDB Streams** | Stream on `design-details` | Trigger email Lambda on new inserts |
-| **SES** | Email sender | Notify business owner of new prospective clients |
+| **SES** | Email sender | **Work in progress, will send email to prospective client |
 
 ## API Endpoints
 
