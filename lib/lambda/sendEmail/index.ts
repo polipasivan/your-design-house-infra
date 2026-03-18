@@ -35,20 +35,20 @@ export const handler = async (event: DynamoDBStreamEvent): Promise<void> => {
         new SendEmailCommand({
           Source: SENDER_EMAIL,
           Destination: {
-            ToAddresses: [email],
+            ToAddresses: ['yoursbyemily@gmail.com'],
           },
           Message: {
             Subject: {
-              Data: 'Thank you for your design details',
+              Data: 'Email From Prospective Client',
               Charset: 'UTF-8',
             },
             Body: {
               Html: {
-                Data: `<h1>Hello ${name},</h1><p>Thank you for submitting your design details. We have received your information and will be in touch soon.</p>`,
+                Data: `<p>Client: ${name} with email: ${email}</p>`,
                 Charset: 'UTF-8',
               },
               Text: {
-                Data: `Hello ${name}, Thank you for submitting your design details. We have received your information and will be in touch soon.`,
+                Data: `Client: ${name} with email: ${email}`,
                 Charset: 'UTF-8',
               },
             },
@@ -56,9 +56,9 @@ export const handler = async (event: DynamoDBStreamEvent): Promise<void> => {
         })
       );
 
-      console.log(`Email sent successfully to ${email}`);
+      console.log(`Email sent successfully to yoursbyemily@gmail.com`);
     } catch (error) {
-      console.error(`Failed to send email to ${email}:`, error);
+      console.error(`Failed to send email to yoursbyemily@gmail.com:`, error);
       throw error;
     }
   }

@@ -43,7 +43,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       functionName: 'writeToDynamo',
       entry: path.join(__dirname, 'lambda', 'writeToDynamo', 'index.ts'),
       handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -53,7 +53,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       bundling: {
         minify: true,
         sourceMap: true,
-        target: 'node20',
+        target: 'node24',
         forceDockerBundling: false,
       },
     });
@@ -65,7 +65,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       functionName: 'designDetails',
       entry: path.join(__dirname, 'lambda', 'designDetails', 'index.ts'),
       handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -75,7 +75,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       bundling: {
         minify: true,
         sourceMap: true,
-        target: 'node20',
+        target: 'node24',
         forceDockerBundling: false,
       },
     });
@@ -86,7 +86,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       functionName: 'sendEmail',
       entry: path.join(__dirname, 'lambda', 'sendEmail', 'index.ts'),
       handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       memorySize: 256,
       timeout: cdk.Duration.seconds(30),
       environment: {
@@ -96,7 +96,7 @@ export class YourDesignHouseInfraStack extends cdk.Stack {
       bundling: {
         minify: true,
         sourceMap: true,
-        target: 'node20',
+        target: 'node24',
         forceDockerBundling: false,
       },
     });
